@@ -61,7 +61,6 @@
 ├── .env
 ├── docker-compose.yml
 └── README.md
-
 ```
 
 ## 🛠️ Использование
@@ -105,7 +104,7 @@
 Скачайте файл `train.csv` из соревнования https://www.kaggle.com/competitions/teta-ml-1-2025 и разместите в директории `.services/fraud_detector/train_data`
 ```bash
 git clone https://github.com/uroplatus666/mts25_mlops_hse_2part.git
-cd fraud-detection-system
+cd mts25_mlops_hse_2part
 
 # Сборка и запуск всех сервисов
 docker-compose up --build
@@ -117,11 +116,18 @@ docker-compose up --build
 ```bash
 docker-compose logs <service_name>  # Например: fraud_detector, kafka, interface
 ```
+
 Посмотреть содержание PostgreSQL БД
 ```bash
 docker exec -it <CONTAINER ID>  psql -U app -d frauddb
 \dt
 ```
+Остановить контейнеры и удалить все созданные volume
+```bash
+docker compose down
+docker volume rm $(docker volume ls -q)
+```
+
 ## Настройки Kafka
 ```yml
 Топики:
