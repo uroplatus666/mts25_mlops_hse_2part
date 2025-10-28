@@ -141,6 +141,6 @@ docker volume rm $(docker volume ls -q)
 *Примечание:* 
 
 Для полной функциональности убедитесь, что:
-1. Модель `my_catboost.cbm` размещена в `fraud_detector/models/`
-2. Тренировочные данные находятся в `fraud_detector/train_data/`
+1. Модель `model_xgb.json` размещена в `services/fraud_detector/models/` (нужна примерно минута на автоматическую загрузку с диска)
+2. Тренировочные данные находятся в `services/fraud_detector/train_data/`
 3. Порты 8080, 8501, 9095, 2181 и 5432 свободны на хосте
