@@ -5,9 +5,6 @@ from kafka import KafkaProducer
 import psycopg2
 import plotly.express as px
 
-# =========================
-# ENV (user-provided inputs)
-# =========================
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BROKERS", "kafka:9092")
 KAFKA_IN_TOPIC  = os.getenv("KAFKA_TRANSACTIONS_TOPIC")
 
@@ -17,12 +14,10 @@ PG_DB   = os.getenv("POSTGRES_DB")
 PG_USER = os.getenv("POSTGRES_USER")
 PG_PASS = os.getenv("POSTGRES_PASSWORD")
 
-# =========================
-# Page & global styling
-# =========================
+
+# Page styling
 st.set_page_config(page_title="Fraud RT", page_icon="🛡️", layout="wide")
 
-# Subtle, clean UI polish (no logic changes)
 st.markdown(
     """
     <style>
@@ -73,14 +68,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# =========================
 # Tabs
-# =========================
 tab_send, tab_view = st.tabs(["📤 Отправить CSV → Kafka", "📊 Посмотреть результаты"])
 
-# =========================
 # TAB 1 — SEND TO KAFKA
-# =========================
 with tab_send:
     st.markdown("Загрузите `test.csv` из соревнования — строки будут отправлены в Kafka по одной.")
     with st.expander("Формат файла (проверка перед отправкой)", expanded=False):
@@ -113,11 +104,11 @@ with tab_send:
     if send_clicked and uploaded is not None:
         try:
             df = pd.read_csv(io.BytesIO(uploaded.getvalue()))
-            # Гарантируем наличие transaction_id (как в исходной логике)
+            # Гарантируем наличие transaction_id
             if "transaction_id" not in df.columns:
                 df["transaction_id"] = [str(uuid.uuid4()) for _ in range(len(df))]
 
-            # Визуальные индикаторы процесса (логика доставки не меняется)
+            # Визуальные индикаторы процесса
             progress = st.progress(0, text="Подключение к Kafka…")
             status_box = st.empty()
 
@@ -129,7 +120,7 @@ with tab_send:
 
             total = len(df)
             sent = 0
-            # шагаем прогрессом по 100 шагам, не меняя реализацию по сути
+            # шагаем прогрессом по 100 шагам
             step = max(1, total // 100)
 
             for i, (_, row) in enumerate(df.iterrows(), start=1):
@@ -144,13 +135,11 @@ with tab_send:
         except Exception as e:
             st.error(f"Ошибка отправки в Kafka: {e}")
 
-# =========================
 # TAB 2 — VIEW RESULTS
-# =========================
 with tab_view:
     st.subheader("Последние фрод-транзакции")
 
-    # UI элементы перед запросами (логика запросов не меняется)
+    # UI элементы перед запросами
     act_cols = st.columns([1, 1, 6])
     with act_cols[0]:
         refresh = st.button("🔄 Обновить", use_container_width=True)
@@ -161,12 +150,12 @@ with tab_view:
         st.rerun()
 
     try:
-        # Подключение (данные/секреты не отображаем нигде)
+        # Подключение
         conn = psycopg2.connect(
             host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS
         )
 
-        # ===== Query 1 (как в исходной логике) =====
+        # ===== Query 1 =====
         q1 = """
         SELECT transaction_id, score, fraud_flag, created_at
         FROM scores
@@ -176,7 +165,7 @@ with tab_view:
         """
         df1 = pd.read_sql(q1, conn)
 
-        # Верхняя “сводка” (только UI)
+        # Верхняя сводка
         m1, m2, m3 = st.columns(3)
         with m1:
             st.markdown('<div class="metric-card">', unsafe_allow_html=True)
@@ -194,7 +183,7 @@ with tab_view:
         st.dataframe(df1, use_container_width=True)
 
         st.subheader("Распределение скоров (последние 100)")
-        # ===== Query 2 (как в исходной логике) =====
+        # ===== Query 2 =====
         q2 = """
         SELECT score FROM scores
         ORDER BY created_at DESC
@@ -203,7 +192,7 @@ with tab_view:
         df2 = pd.read_sql(q2, conn)
 
         if len(df2) > 0:
-            # Красивее, но тот же смысл: гистограмма plotly
+            # гистограмма plotly
             fig = px.histogram(
                 df2,
                 x="score",
@@ -216,7 +205,7 @@ with tab_view:
             )
             st.plotly_chart(fig, use_container_width=True)
 
-            # Небольшая сводка по последним 100 (только UI)
+            # Небольшая сводка по последним 100
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 st.metric("N", int(df2["score"].count()))
@@ -230,3 +219,4 @@ with tab_view:
             st.info("В базе пока нет данных для графика.")
     except Exception as e:
         st.error(f"Ошибка подключения к БД: {e}")
+
