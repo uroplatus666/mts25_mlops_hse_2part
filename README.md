@@ -114,9 +114,9 @@ docker-compose up --build
 - **Streamlit UI**: http://localhost:8501
 - **Kafka UI**: http://localhost:8080
 - **Логи сервисов**: 
-  ```bash
-  docker-compose logs <service_name>  # Например: fraud_detector, kafka, interface
-  ```
+```bash
+docker-compose logs <service_name>  # Например: fraud_detector, kafka, interface
+```
 Посмотреть содержание PostgreSQL БД
 ```bash
 docker exec -it <CONTAINER ID>  psql -U app -d frauddb
