@@ -124,8 +124,6 @@ services:
       KAFKA_TRANSACTIONS_TOPIC: ${KAFKA_TRANSACTIONS_TOPIC}
       KAFKA_SCORING_TOPIC: ${KAFKA_SCORING_TOPIC}
     volumes:
-      - ./services/fraud_detector/input:/app/input
-      - ./services/fraud_detector/output:/app/output
       - ./services/fraud_detector/models:/app/models
       - ./services/fraud_detector/train_data:/app/train_data:ro
     restart: unless-stopped
@@ -157,4 +155,5 @@ networks:
     driver: bridge
 
 volumes:
+
   pgdata:
