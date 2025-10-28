@@ -1,4 +1,3 @@
-# Читает Kafka: scores → upsert в PostgreSQL (transaction_id, score, fraud_flag, created_at)
 import os, json, time, logging, sys
 from kafka import KafkaConsumer
 import psycopg2
@@ -47,7 +46,6 @@ def ensure_table(conn):
     log.info("Table 'scores' ensured")
 
 def main():
-    # PG init
     while True:
         try:
             conn = pg_connect()
@@ -105,4 +103,5 @@ def main():
             time.sleep(1.0)
 
 if __name__ == "__main__":
+
     main()
