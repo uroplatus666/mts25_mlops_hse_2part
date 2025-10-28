@@ -104,7 +104,7 @@
 
 Скачайте файл `train.csv` из соревнования https://www.kaggle.com/competitions/teta-ml-1-2025 и разместите в директории `.services/fraud_detector/train_data`
 ```bash
-git clone https://github.com/your-repo/fraud-detection-system.git
+git clone https://github.com/uroplatus666/mts25_mlops_hse_2part.git
 cd fraud-detection-system
 
 # Сборка и запуск всех сервисов
