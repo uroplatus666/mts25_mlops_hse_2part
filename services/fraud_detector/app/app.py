@@ -13,13 +13,12 @@ from typing import Dict, Any, Iterable, List, Tuple
 import pandas as pd
 from confluent_kafka import Consumer, Producer
 
-# гарантируем каталог для логов
 os.makedirs("/app/logs", exist_ok=True)
 
 # доступ к локальным модулям
 sys.path.append(os.path.abspath("./src"))
-from preprocessing import load_train_data, run_preproc  # noqa: E402
-from scorer import XGBScorer  # noqa: E402
+from preprocessing import load_train_data, run_preproc
+from scorer import XGBScorer
 
 
 # --------- Логирование ---------
@@ -83,7 +82,6 @@ def _parse_csv_row(row_text: str) -> Dict[str, Any]:
     if len(row) < 2:
         raise ValueError("CSV row too short")
 
-    # подрезаем до нужного числа полей
     row = (row + [""] * len(CSV_COLUMNS))[: len(CSV_COLUMNS)]
     rec = dict(zip(CSV_COLUMNS, row))
 
@@ -96,7 +94,6 @@ def _parse_csv_row(row_text: str) -> Dict[str, Any]:
 
     def _to_int(x):
         try:
-            # int('') -> error, int('12.0') -> 12
             return int(float(x))
         except Exception:
             return None
@@ -131,11 +128,10 @@ def _extract_records(payload: Any) -> List[Tuple[str, Dict[str, Any]]]:
                 or str(uuid.uuid4())
             )
             return str(tx_id), rec
-        # плоская запись
+
         tx_id = item.get("transaction_id") or item.get("id") or str(uuid.uuid4())
         return str(tx_id), item
 
-    # C) сырая строка
     if isinstance(payload, str):
         rec = _parse_csv_row(payload)
         tx_id = rec.get("transaction_id") or str(uuid.uuid4())
@@ -158,11 +154,6 @@ def _extract_records(payload: Any) -> List[Tuple[str, Dict[str, Any]]]:
 
 
 def _maybe_repair_record(rec: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Чиним самые частые проблемы:
-    - В transaction_time приезжает вся CSV-строка (из-за запятых в мерчанте).
-      Тогда вытаскиваем корректный таймстемп как первый токен CSV.
-    """
     ts = rec.get("transaction_time")
     if isinstance(ts, str) and "," in ts:
         # Пытаемся распарсить всю строку — если получилось, просто берём оттуда поля
@@ -200,7 +191,6 @@ class Service:
             GROUP_ID,
         )
 
-        # корректное завершение по SIGTERM/SIGINT
         signal.signal(signal.SIGTERM, self._graceful_shutdown)
         signal.signal(signal.SIGINT, self._graceful_shutdown)
         self._running = True
@@ -229,7 +219,6 @@ class Service:
         try:
             payload = json.loads(raw.decode("utf-8"))
         except Exception as e:
-            # Возможно, пришла голая CSV-строка — пробуем как есть
             txt = raw.decode("utf-8", errors="ignore").strip()
             try:
                 items = _extract_records(txt)
@@ -247,7 +236,6 @@ class Service:
             try:
                 out = self._score_record(tx_id, rec)
             except Exception as e:
-                # печатаем только ключи, чтобы не светить персональные данные
                 logger.exception(
                     "Scoring failed for tx_id=%s (keys=%s): %s",
                     tx_id,
@@ -266,7 +254,6 @@ class Service:
                         else None
                     ),
                 )
-                # освободить буфер колбэков
                 self.producer.poll(0)
                 logger.info(
                     "Scored tx_id=%s -> score=%.6f, fraud_flag=%d",
