@@ -1,0 +1,160 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: zookeeper
+    networks:
+      - ml-scorer
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    networks:
+      - ml-scorer
+    ports:
+      - "9095:9095"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9095
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  kafka-setup:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: kafka-setup
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - ml-scorer
+    restart: on-failure
+    entrypoint: ["/bin/bash", "-c"]
+    command: |
+      "
+      echo 'Waiting for Kafka...'
+      while ! kafka-topics --bootstrap-server kafka:9092 --list; do
+        sleep 1
+      done
+
+      echo 'Creating topics...'
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transactions --partitions 3 --replication-factor 1 --config retention.ms=604800000
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic scoring --partitions 3 --replication-factor 1 --config retention.ms=604800000
+
+      echo 'Topics created:'
+      kafka-topics --bootstrap-server kafka:9092 --list
+      "
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    networks:
+      - ml-scorer
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:9092"
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    networks:
+      - ml-scorer
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${PG_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  scores_link:
+    build:
+      context: ./services/scores_link
+      dockerfile: Dockerfile
+    container_name: scores_link
+    depends_on:
+      - kafka
+      - postgres
+    networks:
+      - ml-scorer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_SCORING_TOPIC: ${KAFKA_SCORING_TOPIC}
+      POSTGRES_HOST: ${PG_HOST}
+      POSTGRES_PORT: ${PG_PORT}
+      POSTGRES_DB: ${PG_DB}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    restart: unless-stopped
+
+  fraud_detector:
+    build:
+      context: ./services/fraud_detector
+      dockerfile: Dockerfile
+    container_name: fraud_detector
+    depends_on:
+      - kafka
+      - kafka-setup
+    networks:
+      - ml-scorer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_TRANSACTIONS_TOPIC: ${KAFKA_TRANSACTIONS_TOPIC}
+      KAFKA_SCORING_TOPIC: ${KAFKA_SCORING_TOPIC}
+    volumes:
+      - ./services/fraud_detector/input:/app/input
+      - ./services/fraud_detector/output:/app/output
+      - ./services/fraud_detector/models:/app/models
+      - ./services/fraud_detector/train_data:/app/train_data:ro
+    restart: unless-stopped
+
+  interface:
+    build:
+      context: ./services/interface
+      dockerfile: Dockerfile
+    container_name: interface
+    depends_on:
+      - kafka
+    networks:
+      - ml-scorer
+    environment:
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_TRANSACTIONS_TOPIC: ${KAFKA_TRANSACTIONS_TOPIC}
+      POSTGRES_HOST: ${PG_HOST}
+      POSTGRES_PORT: ${PG_PORT}
+      POSTGRES_DB: ${PG_DB}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+
+networks:
+  ml-scorer:
+    name: ml-scorer
+    driver: bridge
+
+volumes:
+  pgdata:
