@@ -18,8 +18,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Точки монтирования
-VOLUME /app/input
-VOLUME /app/output
 VOLUME /app/models
 
 CMD ["python", "./app/app.py"]
